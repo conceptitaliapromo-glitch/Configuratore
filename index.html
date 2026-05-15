@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inkflow — Preventivi Stampa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root {
+  --ink: #0f1a2e;
+  --ink-mid: #2a3f5f;
+  --ink-light: #4a6fa5;
+  --accent: #2563eb;
+  --accent-soft: #dbeafe;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --surface-3: #f1f5f9;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text-1: #0f172a;
+  --text-2: #475569;
+  --text-3: #94a3b8;
+  --green: #16a34a;
+  --green-soft: #dcfce7;
+  --amber: #d97706;
+  --amber-soft: #fef3c7;
+  --red: #dc2626;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-lg: 14px;
+  --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+  --font: 'DM Sans', sans-serif;
+  --mono: 'DM Mono', monospace;
+  --sidebar-w: 260px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{font-size:15px;scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--surface-2);color:var(--text-1);min-height:100vh;line-height:1.5}
+
+/* ── LAYOUT ── */
+.shell{display:flex;min-height:100vh}
+.sidebar{width:var(--sidebar-w);background:var(--ink);color:#e8f4ff;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;transition:transform .25s cubic-bezier(.4,0,.2,1)}
+.main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:.75rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.content{padding:1.5rem;max-width:820px;width:100%}
+
+/* ── SIDEBAR ── */
+.sb-brand{padding:1.5rem 1.25rem 1rem;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.08)}
+.sb-logo svg{flex-shrink:0}
+.sb-name{font-size:17px;font-weight:600;letter-spacing:-.3px;color:#e8f4ff}
+.sb-tagline{font-size:11px;color:rgba(232,244,255,.45);margin-top:1px}
+.sb-nav{padding:1rem .75rem;flex:1}
+.sb-label{font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:rgba(232,244,255,.3);padding:.25rem .5rem;margin-bottom:4px}
+.sb-btn{display:flex;align-items:center;gap:10px;width:100%;padding:.6rem .75rem;border:none;background:none;color:rgba(232,244,255,.65);font-family:var(--font);font-size:13.5px;border-radius:var(--radius-sm);cursor:pointer;transition:background .12s,color .12s;text-align:left;margin-bottom:2px}
+.sb-btn svg{opacity:.6;flex-shrink:0;transition:opacity .12s}
+.sb-btn:hover{background:rgba(255,255,255,.07);color:#e8f4ff}
+.sb-btn:hover svg{opacity:.9}
+.sb-btn.on{background:rgba(255,255,255,.12);color:#e8f4ff;font-weight:500}
+.sb-btn.on svg{opacity:1}
+.sb-badge{margin-left:auto;background:var(--accent);color:#fff;font-size:10px;font-weight:600;padding:1px 7px;border-radius:20px;font-family:var(--mono)}
+.sb-footer{padding:1rem 1.25rem;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:rgba(232,244,255,.3)}
+
+/* ── TOPBAR ── */
+.tb-left{display:flex;align-items:center;gap:10px}
+.tb-page{font-size:14px;font-weight:500;color:var(--text-1)}
+.tb-pill{font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid var(--border);color:var(--text-3);font-family:var(--mono)}
+.hamburger{display:none;background:none;border:none;cursor:pointer;padding:6px;color:var(--text-1)}
+.hamburger svg{display:block}
+
+/* ── CARDS / PANELS ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-bottom:1rem;box-shadow:var(--shadow)}
+.card-hd{font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);margin-bottom:1rem;display:flex;align-items:center;gap:6px}
+.card-hd svg{opacity:.5}
+
+/* ── FORM ELEMENTS ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:.875rem}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:12px;color:var(--text-2);font-weight:500}
+.field input,.field select{font-family:var(--font);font-size:13.5px;padding:8px 11px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text-1);width:100%;transition:border-color .15s,box-shadow .15s;appearance:none;-webkit-appearance:none}
+.field input:focus,.field select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.field select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px}
+
+/* ── TOGGLES ── */
+.tog-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+.tog-row:last-child{border-bottom:none;padding-bottom:0}
+.tog-label{font-size:13.5px;color:var(--text-1)}
+.tog-sub{font-size:11.5px;color:var(--text-3);margin-top:1px}
+.tog-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.toggle{position:relative;width:36px;height:20px;cursor:pointer}
+.toggle input{opacity:0;width:0;height:0;position:absolute}
+.toggle-track{position:absolute;inset:0;background:var(--border-strong);border-radius:20px;transition:background .15s}
+.toggle input:checked+.toggle-track{background:var(--accent)}
+.toggle-thumb{position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .15s}
+.toggle input:checked~.toggle-thumb{transform:translateX(16px)}
+.mini-num{width:64px;font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text-1);font-family:var(--mono);text-align:center}
+.mini-num:focus{outline:none;border-color:var(--accent)}
+
+/* ── RECAP ── */
+.recap-line{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:13.5px}
+.recap-line.dim{color:var(--text-3);font-size:12.5px}
+.recap-line .val{font-family:var(--mono);font-size:12.5px}
+.recap-sep{height:1px;background:var(--border);margin:8px 0}
+.recap-total{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0}
+.recap-total .lbl{font-size:14px;font-weight:500}
+.recap-total .val{font-size:22px;font-weight:600;font-family:var(--mono)}
+.recap-unit{font-size:11px;color:var(--text-3);text-align:right;font-family:var(--mono)}
+
+/* ── BUTTONS ── */
+.btn-primary{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:10px;font-size:13.5px;font-weight:500;font-family:var(--font);border-radius:var(--radius-sm);border:none;background:var(--ink);color:#e8f4ff;cursor:pointer;margin-top:1rem;transition:background .12s,transform .08s}
+.btn-primary:hover{background:var(--ink-mid)}
+.btn-primary:active{transform:scale(.99)}
+.btn-row{display:flex;gap:.625rem}
+.btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 14px;font-size:13px;font-weight:500;font-family:var(--font);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text-1);cursor:pointer;transition:background .12s,border-color .12s;flex:1}
+.btn:hover{background:var(--surface-3);border-color:var(--border-strong)}
+.btn.danger{color:var(--red);border-color:#fecaca}
+.btn.danger:hover{background:#fff5f5}
+.qk-btns{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+.qk-btn{font-size:11.5px;padding:3px 11px;border:1px solid var(--border);border-radius:20px;background:none;cursor:pointer;color:var(--text-2);font-family:var(--mono);transition:all .1s}
+.qk-btn:hover{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+
+/* ── ORDER ITEMS ── */
+.order-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.875rem 1.25rem;margin-bottom:.625rem;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow);transition:border-color .15s}
+.order-item:hover{border-color:var(--border-strong)}
+.oi-icon{width:36px;height:36px;border-radius:var(--radius-sm);background:var(--surface-3);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.oi-info{flex:1;min-width:0}
+.oi-name{font-size:13.5px;font-weight:500}
+.oi-desc{font-size:11.5px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.oi-price{text-align:right;flex-shrink:0}
+.oi-tot{font-size:14px;font-weight:600;font-family:var(--mono)}
+.oi-unit{font-size:11px;color:var(--text-3);font-family:var(--mono)}
+.oi-del{background:none;border:none;cursor:pointer;color:var(--text-3);padding:5px;border-radius:4px;transition:color .1s,background .1s}
+.oi-del:hover{color:var(--red);background:#fff5f5}
+
+/* ── MARKUP ── */
+.markup-box{background:var(--surface-3);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem;border:1px solid var(--border)}
+.markup-hd{font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);margin-bottom:1rem}
+.slider-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.slider-row label{font-size:13px;color:var(--text-2);white-space:nowrap;min-width:80px}
+.slider-row input[type=range]{flex:1;-webkit-appearance:none;height:4px;border-radius:4px;background:var(--border-strong);outline:none;cursor:pointer}
+.slider-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);box-shadow:0 1px 4px rgba(37,99,235,.3);cursor:pointer}
+.slider-val{font-size:16px;font-weight:600;font-family:var(--mono);color:var(--text-1);min-width:52px;text-align:right}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:.625rem;margin-top:1rem}
+.metric{background:var(--surface);border-radius:var(--radius-sm);padding:.875rem;border:1px solid var(--border)}
+.metric-lbl{font-size:11px;color:var(--text-3);margin-bottom:4px}
+.metric-val{font-size:18px;font-weight:600;font-family:var(--mono)}
+.metric-val.green{color:var(--green)}
+.metric-val.amber{color:var(--amber)}
+
+/* ── GRAND BAR ── */
+.grand-bar{background:var(--ink);color:#e8f4ff;border-radius:var(--radius-lg);padding:1.25rem 1.5rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.grand-bar .side{}
+.grand-bar .lbl{font-size:11px;opacity:.5;margin-bottom:3px}
+.grand-bar .val{font-size:26px;font-weight:600;font-family:var(--mono)}
+.grand-bar .sub{font-size:11px;opacity:.4;margin-top:2px;font-family:var(--mono)}
+.grand-bar .right{text-align:right}
+
+/* ── SAVED ORDERS ── */
+.saved-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.875rem 1.25rem;margin-bottom:.625rem;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow);cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.saved-item:hover{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.07)}
+.si-info{flex:1;min-width:0}
+.si-name{font-size:13.5px;font-weight:500}
+.si-meta{font-size:11.5px;color:var(--text-3);font-family:var(--mono)}
+.si-tot{font-size:14px;font-weight:600;font-family:var(--mono);text-align:right;flex-shrink:0}
+.si-del{background:none;border:none;cursor:pointer;color:var(--text-3);padding:5px;border-radius:4px;flex-shrink:0;transition:color .1s}
+.si-del:hover{color:var(--red)}
+
+/* ── NOTE ── */
+.note-box{font-size:11.5px;color:var(--text-3);padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);line-height:1.6;margin-top:.5rem}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:3rem 1rem;color:var(--text-3)}
+.empty svg{display:block;margin:0 auto 12px;opacity:.3}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--ink);color:#e8f4ff;padding:.75rem 1.25rem;border-radius:var(--radius);font-size:13px;font-weight:500;box-shadow:var(--shadow-md);transform:translateY(20px);opacity:0;transition:all .25s;z-index:9999;pointer-events:none}
+.toast.show{transform:translateY(0);opacity:1}
+
+/* ── OVERLAY (mobile) ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99;backdrop-filter:blur(2px)}
+
+/* ── SECTIONS ── */
+.sec{display:none}.sec.on{display:block}
+
+/* ── RESPONSIVE ── */
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .main{margin-left:0}
+  .overlay{display:block}
+  .overlay.show{display:block;opacity:1}
+  .hamburger{display:flex;align-items:center}
+  .content{padding:1rem}
+  .g2{grid-template-columns:1fr}
+  .metrics{grid-template-columns:1fr 1fr 1fr}
+  .grand-bar .val{font-size:20px}
+  .btn-row{flex-wrap:wrap}
+  .btn-row .btn{flex:1 1 calc(50% - .3rem);min-width:120px}
+}
+@media(max-width:420px){
+  .metrics{grid-template-columns:1fr 1fr;gap:.5rem}
+  .metric:last-child{grid-column:span 2}
+  .grand-bar{flex-direction:column;gap:.75rem;text-align:center}
+  .grand-bar .right{text-align:center}
+}
+
+/* ── PRINT-SAFE (not used but keep) ── */
+@media print{.sidebar,.topbar{display:none}.main{margin:0}}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo">
+      <svg width="36" height="36" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="44" height="44" rx="10" fill="rgba(255,255,255,.08)"/>
+        <path d="M22 8L30 18Q30 26 22 30Q14 26 14 18Z" fill="none" stroke="#e8f4ff" stroke-width="1.5"/>
+        <path d="M22 8L30 18Q30 26 22 30Q14 26 14 18Z" fill="rgba(232,244,255,.08)"/>
+        <path d="M22 30L20 37L22 34.5L24 37Z" fill="#4fa8d8"/>
+        <line x1="22" y1="16" x2="22" y2="30" stroke="#4fa8d8" stroke-width="1.2" stroke-linecap="round"/>
+        <ellipse cx="19.5" cy="15.5" rx="2" ry="3.5" fill="#fff" opacity=".1" transform="rotate(-15 19.5 15.5)"/>
+      </svg>
+    </div>
+    <div>
+      <div class="sb-name">Inkflow</div>
+      <div class="sb-tagline">Preventivi stampa</div>
+    </div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-label">Configuratore</div>
+    <button class="sb-btn on" onclick="goTab('ser',this)">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      Serigrafia
+    </button>
+    <button class="sb-btn" onclick="goTab('dtf',this)">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      DTF
+    </button>
+    <button class="sb-btn" onclick="goTab('ric',this)">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+      Ricamo
+    </button>
+    <div class="sb-label" style="margin-top:1rem">Ordini</div>
+    <button class="sb-btn" onclick="goTab('ord',this)">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      Ordine corrente
+      <span class="sb-badge" id="sb-badge" style="display:none">0</span>
+    </button>
+    <button class="sb-btn" onclick="goTab('saved',this)">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      Ordini salvati
+      <span class="sb-badge" id="sb-saved-badge" style="display:none">0</span>
+    </button>
+  </nav>
+  <div class="sb-footer">Listino 13/05/2026 · IVA esclusa</div>
+</aside>
+
+<!-- OVERLAY mobile -->
+<div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+<!-- MAIN -->
+<div class="main">
+  <header class="topbar">
+    <div class="tb-left">
+      <button class="hamburger" id="hamburger" onclick="toggleSidebar()" aria-label="Menu">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <span class="tb-page" id="tb-page">Serigrafia</span>
+    </div>
+    <div class="tb-pill">13/05/2026</div>
+  </header>
+
+  <main style="display:flex;justify-content:center;flex:1">
+  <div class="content">
+
+  <!-- ══ SERIGRAFIA ══ -->
+  <div id="tab-ser" class="sec on">
+    <div class="card">
+      <div class="card-hd">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 0 0 3.52 18.99"/><path d="M3 10a10 10 0 0 1 18-3"/></svg>
+        Parametri stampa
+      </div>
+      <div class="g2" style="margin-bottom:.875rem">
+        <div class="field"><label>Quantità articoli</label><input type="number" id="s-qty" value="100" min="1" oninput="cS()"></div>
+        <div class="field"><label>Tipo capo</label>
+          <select id="s-tipo" onchange="cS()">
+            <option value="0">Capo chiaro</option>
+            <option value="1">Capo scuro</option>
+          </select>
+        </div>
+      </div>
+      <div class="g2">
+        <div class="field"><label>Colori stampa</label>
+          <select id="s-col" onchange="cS()">
+            <option value="0">1 colore</option><option value="1">2 colori</option>
+            <option value="2">3 colori</option><option value="3">4 colori</option>
+            <option value="4">5 colori</option><option value="5">6 colori</option>
+          </select>
+        </div>
+        <div class="field"><label>Posizionamenti</label>
+          <select id="s-pos" onchange="cS()">
+            <option value="1">1 posizione</option><option value="2">2 posizioni</option><option value="3">3 posizioni</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd">Opzioni aggiuntive</div>
+      <div class="tog-row"><div><div class="tog-label">Stampa su felpa</div><div class="tog-sub">+15% a battuta</div></div>
+        <label class="toggle"><input type="checkbox" id="s-felpa" onchange="cS()"><span class="toggle-track"></span><span class="toggle-thumb"></span></label></div>
+      <div class="tog-row"><div><div class="tog-label">Colori speciali</div><div class="tog-sub">+15% a battuta</div></div>
+        <label class="toggle"><input type="checkbox" id="s-special" onchange="cS()"><span class="toggle-track"></span><span class="toggle-thumb"></span></label></div>
+      <div class="tog-row"><div><div class="tog-label">Stampa in quadricromia</div><div class="tog-sub">+€35 per colore</div></div>
+        <label class="toggle"><input type="checkbox" id="s-quadri" onchange="cS()"><span class="toggle-track"></span><span class="toggle-thumb"></span></label></div>
+      <div class="tog-row"><div><div class="tog-label">Piego e imbusto</div><div class="tog-sub">€0,21 al pezzo</div></div>
+        <label class="toggle"><input type="checkbox" id="s-piego" onchange="cS()"><span class="toggle-track"></span><span class="toggle-thumb"></span></label></div>
+      <div class="tog-row"><div><div class="tog-label">Cambio colore</div><div class="tog-sub">€12,00 per cambio</div></div>
+        <div class="tog-right"><label style="font-size:12px;color:var(--text-3)">N°</label><input class="mini-num" type="number" id="s-cambi" value="0" min="0" oninput="cS()"></div></div>
+      <div class="tog-row"><div><div class="tog-label">Messa in macchina (già eseguito)</div><div class="tog-sub">€12,50 per colore/pos.</div></div>
+        <label class="toggle"><input type="checkbox" id="s-messa" onchange="cS()"><span class="toggle-track"></span><span class="toggle-thumb"></span></label></div>
+    </div>
+    <div class="card">
+      <div class="card-hd">Riepilogo</div>
+      <div id="s-recap">—</div>
+      <button class="btn-primary" onclick="add('ser')">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Aggiungi all'ordine
+      </button>
+    </div>
+  </div>
+
+  <!-- ══ DTF ══ -->
+  <div id="tab-dtf" class="sec">
+    <div class="card">
+      <div class="card-hd">Parametri DTF</div>
+      <div class="g2" style="margin-bottom:.875rem">
+        <div class="field"><label>Quantità trasferimenti</label><input type="number" id="d-qty" value="50" min="1" oninput="cD()"></div>
+        <div class="field"><label>Formato</label>
+          <select id="d-fmt" onchange="cD()">
+            <option value="10x5">10×5 cm</option><option value="10x9.5">10×9,5 cm</option>
+            <option value="13.5x19.5">13,5×19,5 cm</option><option value="27.5x19.5">27,5×19,5 cm</option>
+            <option value="27.5x24.5">27,5×24,5 cm</option><option value="27.5x33">27,5×33 cm</option>
+          </select>
+        </div>
+      </div>
+      <div class="g2">
+        <div class="field"><label>Tipo articolo</label>
+          <select id="d-art" onchange="cD()">
+            <option value="0.33">Maglia / Polo</option><option value="0.41">Felpa</option>
+            <option value="0.57">Giacca / Pantalone</option><option value="0.65">Zaino / Borsa</option>
+            <option value="0.33">Shopper</option><option value="0.81">Ombrello</option><option value="0.33">Cappello</option>
+          </select>
+        </div>
+        <div class="field"><label>Posizionamenti</label>
+          <select id="d-pos" onchange="cD()">
+            <option value="1">1 posizione</option><option value="2">2 posizioni</option><option value="3">3 posizioni</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd">Opzioni aggiuntive</div>
+      <div class="tog-row"><div><div class="tog-label">Elaborazione grafica plancia</div><div class="tog-sub">€24,50 una tantum</div></div>
+        <label class="toggle"><input type="checkbox" id="d-graf" onchange="cD()"><span class="toggle-track"></span><span class="toggle-thumb"></span></label></div>
+      <div class="tog-row"><div><div class="tog-label">DTF al metro lineare (base 56 cm)</div><div class="tog-sub">€13/ml ≤1mt · €12,50 2–5mt · €11,50 da 6mt</div></div>
+        <label class="toggle"><input type="checkbox" id="d-metro" onchange="cD()"><span class="toggle-track"></span><span class="toggle-thumb"></span></label></div>
+      <div id="d-mt-box" style="display:none;padding:10px 0 0">
+        <div class="field"><label>Metri lineari</label><input type="number" id="d-mt" value="1" min="0.5" step="0.5" oninput="cD()"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd">Riepilogo</div>
+      <div id="d-recap">—</div>
+      <button class="btn-primary" onclick="add('dtf')">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Aggiungi all'ordine
+      </button>
+    </div>
+  </div>
+
+  <!-- ══ RICAMO ══ -->
+  <div id="tab-ric" class="sec">
+    <div class="card">
+      <div class="card-hd">Parametri ricamo</div>
+      <div class="g2" style="margin-bottom:.875rem">
+        <div class="field"><label>Quantità articoli</label><input type="number" id="r-qty" value="20" min="1" oninput="cR()"></div>
+        <div class="field"><label>Formato logo</label>
+          <select id="r-fmt" onchange="cR()">
+            <option value="10x5">10×5 cm</option><option value="11x10">11×10 cm</option>
+            <option value="16x10">16×10 cm</option><option value="25x20">25×20 cm</option><option value="27x24">27×24 cm</option>
+          </select>
+        </div>
+      </div>
+      <div class="g2">
+        <div class="field"><label>Posizionamenti</label>
+          <select id="r-pos" onchange="cR()">
+            <option value="1">1 posizione</option><option value="2">2 posizioni</option><option value="3">3 posizioni</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd">Opzioni aggiuntive</div>
+      <div class="tog-row"><div><div class="tog-label">Impianto ricamo (prima volta)</div><div class="tog-sub">€32,00 per posizione</div></div>
+        <label class="toggle"><input type="checkbox" id="r-imp" checked onchange="cR()"><span class="toggle-track"></span><span class="toggle-thumb"></span></label></div>
+    </div>
+    <div class="card">
+      <div class="card-hd">Riepilogo</div>
+      <div id="r-recap">—</div>
+      <button class="btn-primary" onclick="add('ric')">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Aggiungi all'ordine
+      </button>
+    </div>
+  </div>
+
+  <!-- ══ ORDINE CORRENTE ══ -->
+  <div id="tab-ord" class="sec">
+    <div class="card">
+      <div class="card-hd">Dati cliente</div>
+      <div class="g2">
+        <div class="field"><label>Nome cliente</label><input type="text" id="o-nome" placeholder="Es. Mario Rossi"></div>
+        <div class="field"><label>Riferimento ordine</label><input type="text" id="o-rif" placeholder="Es. ORD-2026-001"></div>
+      </div>
+    </div>
+    <div id="ord-list"></div>
+    <div id="ord-footer" style="display:none">
+      <div class="markup-box">
+        <div class="markup-hd">Ricarico sul costo di stampa</div>
+        <div class="slider-row">
+          <label>Percentuale</label>
+          <input type="range" id="mk-range" min="0" max="200" value="30" step="1" oninput="upMk()">
+          <span class="slider-val" id="mk-pct">30%</span>
+        </div>
+        <div class="qk-btns">
+          <button class="qk-btn" onclick="setMk(0)">0%</button>
+          <button class="qk-btn" onclick="setMk(20)">20%</button>
+          <button class="qk-btn" onclick="setMk(30)">30%</button>
+          <button class="qk-btn" onclick="setMk(50)">50%</button>
+          <button class="qk-btn" onclick="setMk(100)">100%</button>
+        </div>
+        <div class="metrics" id="mk-metrics"></div>
+      </div>
+      <div class="grand-bar">
+        <div class="side">
+          <div class="lbl">Costo stampa</div>
+          <div class="val" id="gb-cost">€0,00</div>
+          <div class="sub">IVA esclusa</div>
+        </div>
+        <div class="side right">
+          <div class="lbl">Prezzo cliente</div>
+          <div class="val" id="gb-client">€0,00</div>
+          <div class="sub" id="gb-margin">Margine: €0,00</div>
+        </div>
+      </div>
+      <div class="btn-row" style="margin-bottom:.625rem">
+        <button class="btn" onclick="saveOrder()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Salva ordine
+        </button>
+        <button class="btn" onclick="xPDF()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          PDF
+        </button>
+        <button class="btn" onclick="xXLS()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+          Excel
+        </button>
+        <button class="btn danger" onclick="clearOrd()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          Svuota
+        </button>
+      </div>
+      <div class="note-box">Prezzi IVA esclusa · Impianto serigrafia €25/col/pos · Listino 13/05/2026</div>
+    </div>
+  </div>
+
+  <!-- ══ ORDINI SALVATI ══ -->
+  <div id="tab-saved" class="sec">
+    <div id="saved-list"></div>
+  </div>
+
+  </div><!-- content -->
+  </main>
+</div><!-- main -->
+</div><!-- shell -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── DATA ──
+var items=[], markup=30;
+
+var SB=[
+  {max:49,fixed:true,c:[[65,75],[75,85],[85,95],[95,105],[105,120],[115,130]]},
+  {min:50,max:99,c:[[.94,1.12],[1.08,1.29],[1.19,1.42],[1.30,1.57],[1.44,1.72],[1.58,1.89]]},
+  {min:100,max:349,c:[[.67,.86],[.77,.98],[.88,1.13],[1.02,1.30],[1.17,1.50],[1.34,1.72]]},
+  {min:350,max:549,c:[[.48,.66],[.55,.76],[.63,.88],[.72,1.01],[.83,1.16],[.96,1.33]]},
+  {min:550,max:1299,c:[[.45,.64],[.52,.73],[.59,.84],[.68,.97],[.78,1.11],[.90,1.28]]},
+  {min:1300,max:2499,c:[[.42,.61],[.48,.70],[.56,.80],[.64,.92],[.73,1.06],[.84,1.22]]},
+  {min:2500,max:5499,c:[[.41,.58],[.47,.67],[.54,.77],[.62,.88],[.72,1.02],[.82,1.17]]},
+  {min:5500,max:9999,c:[[.39,.57],[.45,.66],[.51,.76],[.59,.87],[.68,1.01],[.78,1.16]]},
+  {min:10000,c:[[.35,.56],[.41,.64],[.47,.74],[.54,.85],[.62,.97],[.71,1.12]]}
+];
+var DP={"10x5":[.51,.34,.26,.22,.20,.18],"10x9.5":[.91,.61,.47,.39,.35,.32],"13.5x19.5":[2.27,1.51,1.16,.97,.88,.80],"27.5x19.5":[4.56,3.04,2.34,1.95,1.77,1.61],"27.5x24.5":[5.67,3.78,2.91,2.42,2.20,2.00],"27.5x33":[7.59,5.06,3.89,3.24,2.95,2.68]};
+var RP={"10x5":[3.58,2.93,2.44,1.95,1.63],"11x10":[4.88,4.23,3.58,2.93,2.60],"16x10":[6.83,5.85,4.88,4.23,3.58],"25x20":[8.78,7.48,6.50,5.85,5.20],"27x24":[11.05,9.43,8.13,7.15,6.18]};
+
+function eu(n){return'\u20AC'+n.toFixed(2).replace('.',',');}
+function getSB(q){for(var b of SB){if(b.fixed&&q<=49)return b;if(!b.fixed&&q>=(b.min||0)&&(!b.max||q<=b.max))return b;}return SB[SB.length-1];}
+function getDI(q){return q<=5?0:q<=10?1:q<=50?2:q<=100?3:q<=500?4:5;}
+function getRI(q){return q<=10?0:q<=20?1:q<=50?2:q<=100?3:4;}
+
+function recap(el,lines,tot,unit){
+  var h='';
+  for(var l of lines)h+='<div class="recap-line'+(l.dim?' dim':'')+'"><span>'+l.k+'</span><span class="val">'+l.v+'</span></div>';
+  h+='<div class="recap-sep"></div><div class="recap-total"><span class="lbl">Totale</span><span class="val">'+eu(tot)+'</span></div><div class="recap-unit">'+eu(unit)+' / pz</div>';
+  document.getElementById(el).innerHTML=h;
+}
+
+function cS(){
+  var q=Math.max(1,parseInt(document.getElementById('s-qty').value)||1);
+  var t=parseInt(document.getElementById('s-tipo').value);
+  var c=parseInt(document.getElementById('s-col').value);
+  var p=parseInt(document.getElementById('s-pos').value);
+  var felpa=document.getElementById('s-felpa').checked,spec=document.getElementById('s-special').checked;
+  var quad=document.getElementById('s-quadri').checked,pieg=document.getElementById('s-piego').checked;
+  var camb=parseInt(document.getElementById('s-cambi').value)||0,mess=document.getElementById('s-messa').checked;
+  var band=getSB(q);var base=band.c[c][t];
+  var stamp=band.fixed?base:base*q;
+  var mult=1+(felpa?.15:0)+(spec?.15:0);
+  var stampa=stamp*mult*p;var imp=25*(c+1)*p;var ex=0;
+  if(quad)ex+=35*(c+1);if(pieg)ex+=0.21*q;if(camb)ex+=12*camb;if(mess)ex+=12.5*(c+1)*p;
+  var tot=stampa+imp+ex;
+  var lines=[{k:'Stampa ('+(c+1)+'col \xD7'+p+'pos)',v:eu(stampa)},{k:'Impianto stampa',v:eu(imp),dim:true}];
+  if(quad)lines.push({k:'Quadricromia',v:eu(35*(c+1)),dim:true});
+  if(pieg)lines.push({k:'Piego e imbusto (\xD7'+q+')',v:eu(.21*q),dim:true});
+  if(camb)lines.push({k:'Cambio colore (\xD7'+camb+')',v:eu(12*camb),dim:true});
+  if(mess)lines.push({k:'Messa in macchina',v:eu(12.5*(c+1)*p),dim:true});
+  recap('s-recap',lines,tot,tot/q);
+  return{type:'Serigrafia',qty:q,desc:(c+1)+'col, '+p+'pos, '+(t?'scuro':'chiaro'),tot:tot,unit:tot/q,lines:lines};
+}
+
+function cD(){
+  var q=Math.max(1,parseInt(document.getElementById('d-qty').value)||1);
+  var fmt=document.getElementById('d-fmt').value,app=parseFloat(document.getElementById('d-art').value);
+  var p=parseInt(document.getElementById('d-pos').value);
+  var graf=document.getElementById('d-graf').checked,metro=document.getElementById('d-metro').checked;
+  document.getElementById('d-mt-box').style.display=metro?'block':'none';
+  var mt=parseFloat(document.getElementById('d-mt').value)||1;
+  var uTrf=DP[fmt][getDI(q)];var stamp=uTrf*q*p;var appl=app*q*p;
+  var ex=graf?24.5:0;var mtTot=0;
+  if(metro){var pml=mt<=1?13:mt<=5?12.5:11.5;mtTot=pml*mt;ex+=mtTot;}
+  var tot=stamp+appl+ex;
+  var lines=[{k:'Trasferimento '+fmt+' \xD7'+q+' \xD7'+p+'pos',v:eu(stamp)},{k:'Applicazione '+eu(app)+'/pz \xD7'+q+' \xD7'+p+'pos',v:eu(appl),dim:true}];
+  if(graf)lines.push({k:'Elaborazione grafica',v:eu(24.5),dim:true});
+  if(metro)lines.push({k:'DTF al metro ('+mt+'ml)',v:eu(mtTot),dim:true});
+  recap('d-recap',lines,tot,tot/q);
+  return{type:'DTF',qty:q,desc:fmt+', '+p+'pos',tot:tot,unit:tot/q,lines:lines};
+}
+
+function cR(){
+  var q=Math.max(1,parseInt(document.getElementById('r-qty').value)||1);
+  var fmt=document.getElementById('r-fmt').value,p=parseInt(document.getElementById('r-pos').value);
+  var imp=document.getElementById('r-imp').checked;
+  var uRic=RP[fmt][getRI(q)];var ric=uRic*q*p;var impTot=imp?32*p:0;var tot=ric+impTot;
+  var lines=[{k:'Ricamo '+fmt+' \xD7'+q+' \xD7'+p+'pos',v:eu(ric)}];
+  if(imp)lines.push({k:'Impianto ricamo \xD7'+p+'pos',v:eu(impTot),dim:true});
+  recap('r-recap',lines,tot,tot/q);
+  return{type:'Ricamo',qty:q,desc:fmt+', '+p+'pos',tot:tot,unit:tot/q,lines:lines};
+}
+
+function add(tab){
+  var item;
+  if(tab==='ser')item=cS();else if(tab==='dtf')item=cD();else item=cR();
+  item.id=Date.now();items.push(item);renderOrd();
+  goTab('ord',null);showToast('Aggiunto all\'ordine');
+}
+
+// ── RENDER ORDER ──
+function renderOrd(){
+  var badge=document.getElementById('sb-badge');
+  if(items.length){badge.style.display='inline';badge.textContent=items.length;}else badge.style.display='none';
+  var list=document.getElementById('ord-list'),footer=document.getElementById('ord-footer');
+  if(!items.length){
+    list.innerHTML='<div class="empty"><svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><p style="font-size:14px;margin-top:4px">Nessun articolo.<br><span style="font-size:12px">Configura e aggiungi all\'ordine.</span></p></div>';
+    footer.style.display='none';return;
+  }
+  var icons={Serigrafia:'<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',DTF:'<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>',Ricamo:'<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>'};
+  var h='';
+  items.forEach(function(it){
+    h+='<div class="order-item"><div class="oi-icon">'+icons[it.type]+'</div>';
+    h+='<div class="oi-info"><div class="oi-name">'+it.type+' &mdash; '+it.qty+' pz</div><div class="oi-desc">'+it.desc+'</div></div>';
+    h+='<div class="oi-price"><div class="oi-tot">'+eu(it.tot)+'</div><div class="oi-unit">'+eu(it.unit)+'/pz</div></div>';
+    h+='<button class="oi-del" onclick="removeIt('+it.id+')" title="Rimuovi"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button></div>';
+  });
+  list.innerHTML=h;footer.style.display='block';upMk();
+}
+
+function upMk(){
+  markup=parseInt(document.getElementById('mk-range').value);
+  document.getElementById('mk-pct').textContent=markup+'%';
+  var cost=items.reduce(function(s,i){return s+i.tot;},0);
+  var client=cost*(1+markup/100),margin=client-cost;
+  document.getElementById('gb-cost').textContent=eu(cost);
+  document.getElementById('gb-client').textContent=eu(client);
+  document.getElementById('gb-margin').textContent='Margine: '+eu(margin);
+  document.getElementById('mk-metrics').innerHTML=
+    '<div class="metric"><div class="metric-lbl">Costo stampa</div><div class="metric-val">'+eu(cost)+'</div></div>'+
+    '<div class="metric"><div class="metric-lbl">Prezzo cliente</div><div class="metric-val green">'+eu(client)+'</div></div>'+
+    '<div class="metric"><div class="metric-lbl">Margine ('+markup+'%)</div><div class="metric-val amber">'+eu(margin)+'</div></div>';
+}
+
+function setMk(v){document.getElementById('mk-range').value=v;upMk();}
+function removeIt(id){items=items.filter(function(i){return i.id!==id;});renderOrd();}
+function clearOrd(){if(!confirm('Svuotare l\'ordine corrente?'))return;items=[];renderOrd();showToast('Ordine svuotato');}
+function getClient(){return{nome:document.getElementById('o-nome').value.trim()||'—',rif:document.getElementById('o-rif').value.trim()||'—'};}
+
+// ── SAVE / LOAD ORDERS ──
+function getSavedOrders(){try{return JSON.parse(localStorage.getItem('inkflow_orders')||'[]');}catch(e){return[];}}
+function setSavedOrders(arr){localStorage.setItem('inkflow_orders',JSON.stringify(arr));}
+
+function saveOrder(){
+  if(!items.length){showToast('Nessun articolo da salvare');return;}
+  var c=getClient();
+  var cost=items.reduce(function(s,i){return s+i.tot;},0);
+  var client=cost*(1+markup/100);
+  var saved=getSavedOrders();
+  var entry={id:Date.now(),nome:c.nome,rif:c.rif,data:new Date().toLocaleDateString('it-IT'),markup:markup,cost:cost,client:client,items:JSON.parse(JSON.stringify(items))};
+  saved.unshift(entry);
+  if(saved.length>50)saved=saved.slice(0,50);
+  setSavedOrders(saved);
+  updateSavedBadge();
+  showToast('Ordine salvato');
+  renderSaved();
+}
+
+function updateSavedBadge(){
+  var saved=getSavedOrders();
+  var b=document.getElementById('sb-saved-badge');
+  if(saved.length){b.style.display='inline';b.textContent=saved.length;}else b.style.display='none';
+}
+
+function loadOrder(id){
+  var saved=getSavedOrders();
+  var entry=saved.find(function(s){return s.id===id;});
+  if(!entry)return;
+  items=JSON.parse(JSON.stringify(entry.items));
+  markup=entry.markup;
+  document.getElementById('mk-range').value=markup;
+  document.getElementById('o-nome').value=entry.nome==='—'?'':entry.nome;
+  document.getElementById('o-rif').value=entry.rif==='—'?'':entry.rif;
+  renderOrd();goTab('ord',null);showToast('Ordine caricato');
+}
+
+function deleteSaved(id){
+  var saved=getSavedOrders().filter(function(s){return s.id!==id;});
+  setSavedOrders(saved);updateSavedBadge();renderSaved();showToast('Ordine eliminato');
+}
+
+function renderSaved(){
+  var saved=getSavedOrders();
+  var list=document.getElementById('saved-list');
+  if(!saved.length){
+    list.innerHTML='<div class="empty"><svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><p style="font-size:14px;margin-top:4px">Nessun ordine salvato.</p></div>';
+    return;
+  }
+  var h='<div class="card"><div class="card-hd">Ordini salvati ('+saved.length+')</div>';
+  saved.forEach(function(s){
+    h+='<div class="saved-item" onclick="loadOrder('+s.id+')">';
+    h+='<div class="si-info"><div class="si-name">'+s.nome+' &mdash; '+s.rif+'</div>';
+    h+='<div class="si-meta">'+s.data+' &nbsp;·&nbsp; '+s.items.length+' voc'+(s.items.length===1?'e':'i')+' &nbsp;·&nbsp; ricarico '+s.markup+'%</div></div>';
+    h+='<div class="si-tot">'+eu(s.client)+'</div>';
+    h+='<button class="si-del" onclick="event.stopPropagation();deleteSaved('+s.id+')" title="Elimina"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M9 6V4h6v2"/></svg></button>';
+    h+='</div>';
+  });
+  h+='</div>';
+  list.innerHTML=h;
+}
+
+// ── EXPORT PDF ──
+function xPDF(){
+  if(!items.length){showToast('Nessun articolo');return;}
+  var jsPDF=window.jspdf.jsPDF;
+  var doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  var W=210,mg=16,cW=W-mg*2;
+  var c=getClient();
+  var cost=items.reduce(function(s,i){return s+i.tot;},0);
+  var client=cost*(1+markup/100),margin=client-cost;
+  var today=new Date().toLocaleDateString('it-IT');
+
+  // header bar
+  doc.setFillColor(15,26,46);
+  doc.roundedRect(mg,12,cW,26,3,3,'F');
+
+  // logo forma pennino
+  var lx=mg+9,ly=21;
+  doc.setFillColor(232,244,255);doc.setDrawColor(232,244,255);
+  doc.triangle(lx+4,ly-7,lx+10,ly+2,lx-2,ly+2,'F');
+  doc.setFillColor(79,168,216);
+  doc.triangle(lx+4,ly+2,lx+2,ly+7,lx+6,ly+7,'F');
+  doc.setDrawColor(79,168,216);doc.setLineWidth(.8);
+  doc.line(lx+4,ly,lx+4,ly+2);
+
+  doc.setFontSize(16);doc.setFont('helvetica','bold');doc.setTextColor(232,244,255);
+  doc.text('Inkflow',lx+16,ly+1);
+  doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(130,170,210);
+  doc.text('Preventivi stampa & personalizzazione',lx+16,ly+7);
+  doc.setTextColor(130,170,210);
+  doc.text(today,W-mg-4,ly+1,{align:'right'});
+  doc.text('Ricarico: '+markup+'%',W-mg-4,ly+7,{align:'right'});
+
+  // dati cliente
+  var y=46;
+  doc.setFillColor(245,247,250);doc.roundedRect(mg,y,cW,18,2,2,'F');
+  doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(140,150,165);
+  doc.text('CLIENTE',mg+5,y+6);doc.text('RIFERIMENTO',mg+80,y+6);doc.text('DATA',mg+148,y+6);
+  doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(15,26,46);
+  doc.text(String(c.nome),mg+5,y+13);doc.text(String(c.rif),mg+80,y+13);doc.text(today,mg+148,y+13);
+
+  y+=26;
+  var hasMk=markup>0;
+  var cols=['#','Tipo','Qtà','Descrizione','€/pz costo','Tot. costo'];
+  if(hasMk)cols.push('€/pz cliente','Tot. cliente');
+  var body=items.map(function(it,i){
+    var row=[String(i+1),it.type,String(it.qty)+' pz',it.desc,eu(it.unit),eu(it.tot)];
+    if(hasMk)row.push(eu(it.unit*(1+markup/100)),eu(it.tot*(1+markup/100)));
+    return row;
+  });
+
+  doc.autoTable({
+    startY:y,head:[cols],body:body,
+    margin:{left:mg,right:mg},
+    styles:{fontSize:8.5,cellPadding:3.5,textColor:[15,26,46],font:'helvetica'},
+    headStyles:{fillColor:[15,26,46],textColor:[232,244,255],fontStyle:'bold',fontSize:8},
+    alternateRowStyles:{fillColor:[248,250,252]},
+    columnStyles:{
+      0:{cellWidth:8},1:{cellWidth:22},2:{cellWidth:13},
+      3:{cellWidth:hasMk?35:55},
+      4:{cellWidth:hasMk?18:22,halign:'right'},
+      5:{cellWidth:hasMk?18:22,halign:'right'},
+      6:{cellWidth:hasMk?20:0,halign:'right'},
+      7:{cellWidth:hasMk?22:0,halign:'right'}
+    }
+  });
+
+  var fy=doc.lastAutoTable.finalY+5;
+  doc.setFillColor(220,252,231);doc.roundedRect(mg,fy,cW,hasMk?28:14,2,2,'F');
+  doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(22,101,52);
+  doc.text('Totale costo stampa (IVA esclusa)',mg+5,fy+7);
+  doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.setTextColor(15,26,46);
+  doc.text(eu(cost),W-mg-4,fy+7,{align:'right'});
+  if(hasMk){
+    doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(22,101,52);
+    doc.text('Prezzo al cliente (ricarico '+markup+'%)',mg+5,fy+17);
+    doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.setTextColor(15,26,46);
+    doc.text(eu(client),W-mg-4,fy+17,{align:'right'});
+    doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(80,120,90);
+    doc.text('Margine: '+eu(margin),W-mg-4,fy+24,{align:'right'});
+  }
+  var ny=fy+(hasMk?34:20);
+  doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(170,170,175);
+  doc.text('Prezzi IVA esclusa. I prezzi si riferiscono al solo servizio di stampa/personalizzazione. Listino 13/05/2026.',mg,ny,{maxWidth:cW});
+
+  doc.save('inkflow_preventivo_'+new Date().toISOString().slice(0,10)+'.pdf');
+  showToast('PDF scaricato');
+}
+
+// ── EXPORT EXCEL ──
+function xXLS(){
+  if(!items.length){showToast('Nessun articolo');return;}
+  var c=getClient();
+  var cost=items.reduce(function(s,i){return s+i.tot;},0);
+  var client=cost*(1+markup/100),margin=client-cost;
+  var hdr=['#','Tipo','Qtà','Descrizione','€/pz costo','Tot. costo'];
+  if(markup>0)hdr.push('€/pz cliente','Tot. cliente');
+  var data=[
+    ['INKFLOW — Preventivi stampa & personalizzazione'],
+    ['Cliente:',c.nome,'Rif:',c.rif,'Data:',new Date().toLocaleDateString('it-IT'),'Ricarico:',markup+'%'],
+    [],hdr
+  ];
+  items.forEach(function(it,i){
+    var row=[i+1,it.type,it.qty,it.desc,parseFloat(it.unit.toFixed(4)),parseFloat(it.tot.toFixed(2))];
+    if(markup>0)row.push(parseFloat((it.unit*(1+markup/100)).toFixed(4)),parseFloat((it.tot*(1+markup/100)).toFixed(2)));
+    data.push(row);
+  });
+  data.push([]);
+  var tot=['','','','','Totale costo stampa',parseFloat(cost.toFixed(2))];
+  if(markup>0)tot.push('Prezzo cliente',parseFloat(client.toFixed(2)));
+  data.push(tot);
+  if(markup>0)data.push(['','','','','Margine ('+markup+'%)',parseFloat(margin.toFixed(2))]);
+  data.push([]);data.push(['Prezzi IVA esclusa. Listino 13/05/2026.']);
+  var wb=XLSX.utils.book_new();
+  var ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:4},{wch:18},{wch:8},{wch:30},{wch:14},{wch:14},{wch:16},{wch:16}];
+  XLSX.utils.book_append_sheet(wb,'Preventivo',ws);
+  XLSX.writeFile(wb,'inkflow_preventivo_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  showToast('Excel scaricato');
+}
+
+// ── NAV ──
+var pages={ser:'Serigrafia',dtf:'DTF',ric:'Ricamo',ord:'Ordine corrente',saved:'Ordini salvati'};
+function goTab(t,btn){
+  document.querySelectorAll('.sec').forEach(function(el){el.classList.remove('on');});
+  document.querySelectorAll('.sb-btn').forEach(function(el){el.classList.remove('on');});
+  document.getElementById('tab-'+t).classList.add('on');
+  if(btn){btn.classList.add('on');}
+  else{
+    var idx={ser:0,dtf:1,ric:2,ord:3,saved:4}[t];
+    document.querySelectorAll('.sb-btn')[idx].classList.add('on');
+  }
+  document.getElementById('tb-page').textContent=pages[t];
+  if(t==='saved')renderSaved();
+  closeSidebar();
+}
+
+// ── SIDEBAR MOBILE ──
+function toggleSidebar(){
+  var sb=document.getElementById('sidebar');
+  var ov=document.getElementById('overlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('show');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+// ── TOAST ──
+function showToast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(function(){t.classList.remove('show');},2000);
+}
+
+// ── INIT ──
+cS();cD();cR();renderOrd();updateSavedBadge();
+</script>
+</body>
+</html>
