@@ -182,7 +182,16 @@ body{font-family:var(--font);background:var(--surface-2);color:var(--text-1);min
 .toast.show{transform:translateY(0);opacity:1}
 
 /* ── OVERLAY (mobile) ── */
-.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99;backdrop-filter:blur(2px)}
+.overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.45);
+  z-index:99;
+  backdrop-filter:blur(2px);
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .25s;
+}
+.overlay.show{opacity:1;pointer-events:all;}
 
 /* ── SECTIONS ── */
 .sec{display:none}.sec.on{display:block}
@@ -190,10 +199,8 @@ body{font-family:var(--font);background:var(--surface-2);color:var(--text-1);min
 /* ── RESPONSIVE ── */
 @media(max-width:768px){
   .sidebar{transform:translateX(-100%)}
-  .sidebar.open{transform:translateX(0)}
+  .sidebar.open{transform:translateX(0);box-shadow:4px 0 24px rgba(0,0,0,.3)}
   .main{margin-left:0}
-  .overlay{display:block}
-  .overlay.show{display:block;opacity:1}
   .hamburger{display:flex;align-items:center}
   .content{padding:1rem}
   .g2{grid-template-columns:1fr}
@@ -201,6 +208,9 @@ body{font-family:var(--font);background:var(--surface-2);color:var(--text-1);min
   .grand-bar .val{font-size:20px}
   .btn-row{flex-wrap:wrap}
   .btn-row .btn{flex:1 1 calc(50% - .3rem);min-width:120px}
+}
+@media(min-width:769px){
+  .overlay{display:none!important}
 }
 @media(max-width:420px){
   .metrics{grid-template-columns:1fr 1fr;gap:.5rem}
@@ -826,13 +836,15 @@ function goTab(t,btn){
 function toggleSidebar(){
   var sb=document.getElementById('sidebar');
   var ov=document.getElementById('overlay');
-  sb.classList.toggle('open');
-  ov.classList.toggle('show');
+  var isOpen=sb.classList.contains('open');
+  if(isOpen){sb.classList.remove('open');ov.classList.remove('show');}
+  else{sb.classList.add('open');ov.classList.add('show');}
 }
 function closeSidebar(){
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('overlay').classList.remove('show');
 }
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeSidebar();});
 
 // ── TOAST ──
 function showToast(msg){
